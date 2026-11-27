@@ -7,6 +7,8 @@ import '../config/tema.dart';
 import '../modelos/categoria.dart';
 import '../modelos/lugar_explorar.dart';
 import '../servicios/explorar_servicio.dart';
+import 'detalle_lugar_pantalla.dart';
+import 'lugar_perfil_pantalla.dart';
 
 /// Explorar. Dos modos:
 /// - Normal: categorías, mapa con todos los lugares y destinos recomendados.
@@ -29,7 +31,8 @@ class _ExplorarPantallaState extends State<ExplorarPantalla> {
 
   // --- Modo normal ---
   List<Categoria> _categorias = [];
-  List<LugarExplorar> _lugares = [];
+  List<LugarExplorar> _lugares = []; // todos los lugares (para el mapa)
+  List<LugarExplorar> _recomendados = []; // solo destinos, los mejor calificados primero
   String? _categoriaSlug; // null = Todos
   int? _seleccionado; // lugar tocado en el mapa
   bool _cargando = true;
@@ -59,6 +62,15 @@ class _ExplorarPantallaState extends State<ExplorarPantalla> {
 
   // ---------------- Datos ----------------
 
+  /// Destinos mejor calificados (de la categoría elegida, si hay una).
+  /// El backend los ordena por puntaje: promedio ponderado por la cantidad de reseñas.
+  Future<List<LugarExplorar>> _pedirRecomendados() => ExplorarServicio.lugares(
+        categoria: _categoriaSlug,
+        tipo: 'destino',
+        orden: 'recomendados',
+        limite: 10,
+      );
+
   Future<void> _cargarTodo() async {
     setState(() {
       _cargando = true;
@@ -68,11 +80,13 @@ class _ExplorarPantallaState extends State<ExplorarPantalla> {
       final resultados = await Future.wait([
         ExplorarServicio.categorias(),
         ExplorarServicio.lugares(categoria: _categoriaSlug),
+        _pedirRecomendados(),
       ]);
       if (!mounted) return;
       setState(() {
         _categorias = resultados[0] as List<Categoria>;
         _lugares = resultados[1] as List<LugarExplorar>;
+        _recomendados = resultados[2] as List<LugarExplorar>;
         _cargando = false;
       });
       _ajustarMapa();
@@ -85,13 +99,17 @@ class _ExplorarPantallaState extends State<ExplorarPantalla> {
     }
   }
 
-  /// Modo normal: pide los lugares de la categoría elegida
+  /// Modo normal: pide los lugares y los recomendados de la categoría elegida
   Future<void> _cargarLugares() async {
     try {
-      final lugares = await ExplorarServicio.lugares(categoria: _categoriaSlug);
+      final resultados = await Future.wait([
+        ExplorarServicio.lugares(categoria: _categoriaSlug),
+        _pedirRecomendados(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _lugares = lugares;
+        _lugares = resultados[0];
+        _recomendados = resultados[1];
         _seleccionado = null;
         _error = false;
       });
@@ -193,13 +211,16 @@ class _ExplorarPantallaState extends State<ExplorarPantalla> {
     }
   }
 
-  void _verDetalle(LugarExplorar l) {
-    // Aquí se abrirá la pantalla de detalle del lugar (siguiente paso)
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Aquí se abrirá el detalle de ${l.nombre}'),
-      behavior: SnackBarBehavior.floating,
-    ));
-  }
+  /// Abre la pantalla correcta según el tipo:
+/// - empresa → su perfil
+/// - destino → pantalla de detalle (sin perfil)
+void _verDetalle(LugarExplorar l) {
+  final Widget pantalla = l.tipo == 'empresa'
+      ? LugarPerfilPantalla(lugarId: l.id)
+      : DetalleLugarPantalla(lugarId: l.id, nombreInicial: l.nombre);
+
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => pantalla));
+}
 
   void _verTodasLasCategorias() {
     showModalBottomSheet(
@@ -594,6 +615,9 @@ class _ExplorarPantallaState extends State<ExplorarPantalla> {
         children: [
           const Text('Destinos recomendados',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text('Los mejor calificados por quienes los visitaron',
+              style: TextStyle(fontSize: 13, color: Tema.suave(context))),
           const SizedBox(height: 12),
           if (_cargando)
             const Padding(
@@ -612,17 +636,18 @@ class _ExplorarPantallaState extends State<ExplorarPantalla> {
                     onPressed: _cargarTodo, child: const Text('Reintentar')),
               ],
             )
-          else if (_lugares.isEmpty)
+          else if (_recomendados.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
-                child: Text('No hay lugares en esta categoría.',
+                child: Text('No hay destinos en esta categoría.',
                     style: TextStyle(color: Tema.suave(context))),
               ),
             )
           else
-            for (final l in _lugares)
-              _tarjetaLugar(l, alTocar: () => _seleccionar(l)),
+            // Al tocar un destino se abre su detalle
+            for (final l in _recomendados)
+              _tarjetaLugar(l, alTocar: () => _verDetalle(l)),
         ],
       ),
     );
@@ -706,6 +731,7 @@ class _ExplorarPantallaState extends State<ExplorarPantalla> {
                     ],
                   ),
                 ),
+                // Pin normal: el lugar tiene ubicación en el mapa. Pin tachado: no la tiene.
                 Icon(
                   l.tieneUbicacion
                       ? Icons.location_on_outlined

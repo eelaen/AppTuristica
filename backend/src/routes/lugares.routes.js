@@ -3,10 +3,11 @@ const router = require('express').Router()
 const lugares = require('../controllers/lugares.controller')
 const resenas = require('../controllers/resenas.controller')
 const { verificarToken, permitirRoles } = require('../middlewares/auth')
+const { subirAvatar } = require('../middlewares/subida')
 
 router.get('/', lugares.listar)                                                   // pública: lista y búsqueda
 router.get('/mio', verificarToken, permitirRoles('empresa'), lugares.verMio)      // mi lugar
-router.put('/mio', verificarToken, permitirRoles('empresa'), lugares.editarMio)   // editar mi lugar
+router.put('/mio', verificarToken, permitirRoles('empresa'), subirAvatar, lugares.editarMio)  // editar mi lugar
 router.get('/:id', lugares.ver)                                                   // pública: detalle
 
 // Reseñas (leer es público; dejar una necesita sesión de turista)

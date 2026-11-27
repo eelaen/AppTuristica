@@ -112,9 +112,15 @@ class _PrincipalPantallaState extends State<PrincipalPantalla> {
                   )
                 : const SizedBox.shrink(),
             _tab(3, (_) => const _MiViajePantalla()),
-            _tab(
+                       _tab(
               4,
-              (_) => _PerfilPestana(alIniciarSesion: () => _alTocarBarra(4)),
+              (_) => ValueListenableBuilder<int>(
+                valueListenable: _recargaFeed,
+                builder: (_, recarga, _) => _PerfilPestana(
+                  alIniciarSesion: () => _alTocarBarra(4),
+                  recarga: recarga,
+                ),
+              ),
             ),
           ],
         ),
@@ -128,7 +134,8 @@ class _PrincipalPantallaState extends State<PrincipalPantalla> {
 /// Contenido de la pestaña Perfil: depende de quién tiene la sesión.
 class _PerfilPestana extends StatelessWidget {
   final VoidCallback alIniciarSesion;
-  const _PerfilPestana({required this.alIniciarSesion});
+  final int recarga;
+  const _PerfilPestana({required this.alIniciarSesion, this.recarga = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -155,13 +162,19 @@ class _PerfilPestana extends StatelessWidget {
         ),
       );
     }
-
+    
     if (usuario.esEmpresa) {
-      // La llave hace que se recargue si cambia la persona con sesión
-      return LugarPerfilPantalla(key: ValueKey('lugar-${usuario.id}'), esMio: true);
+      return LugarPerfilPantalla(
+        key: ValueKey('lugar-${usuario.id}'),
+        esMio: true,
+        recarga: recarga,
+      );
     }
-        return PerfilUsuarioPantalla(
-        key: ValueKey('usuario-${usuario.id}'), usuarioId: usuario.id);
+    return PerfilUsuarioPantalla(
+      key: ValueKey('usuario-${usuario.id}'),
+      usuarioId: usuario.id,
+      recarga: recarga,
+    );
   }
 }
 

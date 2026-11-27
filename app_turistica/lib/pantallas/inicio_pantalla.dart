@@ -53,7 +53,11 @@ class _InicioPantallaState extends State<InicioPantalla> {
   Future<List<Publicacion>> _cargar() =>
       PublicacionesServicio.feed(autor: _autor);
 
-  void _recargar() => setState(() => _futuro = _cargar());
+  void _recargar() {
+  setState(() {
+    _futuro = _cargar();
+  });
+}
 
   void _aviso(String texto) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -89,7 +93,9 @@ class _InicioPantallaState extends State<InicioPantalla> {
       child: RefreshIndicator(
         onRefresh: () async {
           final nuevo = _cargar();
-          setState(() => _futuro = nuevo);
+         setState(() {
+        _futuro = nuevo;
+        });
           try {
             await nuevo;
           } catch (_) {

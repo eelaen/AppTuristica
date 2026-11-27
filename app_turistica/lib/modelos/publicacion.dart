@@ -9,6 +9,7 @@ class Publicacion {
   final String usuarioNombre;
   final String usuarioRol; // 'usuario' o 'empresa'
   final bool autorVerificado;
+  final String? autorFoto; // foto del autor (perfil del turista o portada del lugar)
   final int? lugarId; // null si es un turista que no etiquetó lugar
   final String? lugarNombre;
   final int likes;
@@ -25,6 +26,7 @@ class Publicacion {
     required this.usuarioNombre,
     required this.usuarioRol,
     required this.autorVerificado,
+    required this.autorFoto,
     required this.lugarId,
     required this.lugarNombre,
     required this.likes,
@@ -50,6 +52,7 @@ class Publicacion {
       usuarioNombre: json['usuario_nombre'] as String,
       usuarioRol: json['usuario_rol'] as String,
       autorVerificado: json['autor_verificado'] == true,
+      autorFoto: json['autor_foto'] as String?,
       lugarId: json['lugar_id'] as int?,
       lugarNombre: json['lugar_nombre'] as String?,
       likes: (json['likes'] as num).toInt(),

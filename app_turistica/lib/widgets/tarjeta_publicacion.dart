@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../config/api_config.dart';
 import '../config/tema.dart';
 import '../modelos/publicacion.dart';
+import 'avatar_perfil.dart';
 
 /// Tarjeta del feed: autor, foto, etiqueta de oferta, descripción,
 /// likes/comentarios y botón para ver la empresa.
@@ -95,17 +96,7 @@ class TarjetaPublicacion extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: p.esEmpresa
-                ? Tema.chipDe(context)
-                : Tema.coral.withValues(alpha: 0.18),
-            child: Icon(
-              p.esEmpresa ? Icons.storefront_outlined : Icons.person_outline,
-              color: p.esEmpresa ? Tema.acento(context) : Tema.coral,
-              size: 22,
-            ),
-          ),
+          AvatarPerfil(foto: p.autorFoto, tamano: 44),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -141,8 +132,8 @@ class TarjetaPublicacion extends StatelessWidget {
       ),
     );
   }
-
-    /// Foto con esquinas redondeadas
+  
+ /// Foto con esquinas redondeadas
   Widget _foto(BuildContext context, Publicacion p) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),

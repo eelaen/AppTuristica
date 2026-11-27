@@ -8,6 +8,7 @@ import '../proveedores/sesion_proveedor.dart';
 import '../servicios/api_cliente.dart';
 import '../servicios/lugares_servicio.dart';
 import '../servicios/publicaciones_servicio.dart';
+import 'dart:async';
 
 /// Pantalla para subir una foto (el botón + de la barra).
 /// - Turista: elige la foto y el lugar que etiqueta.
@@ -34,6 +35,12 @@ class _SubirPublicacionPantallaState extends State<SubirPublicacionPantalla> {
   String? _nombreArchivo;
   int? _lugarId;
 
+  final _buscadorLugar = TextEditingController();
+  Timer? _espera;
+  Lugar? _lugarElegido;
+  List<Lugar> _sugerencias = [];
+  bool _buscandoLugar = false;
+
   List<Lugar> _lugares = [];
   bool _cargandoLugares = false;
   String? _errorLugares;
@@ -47,14 +54,14 @@ class _SubirPublicacionPantallaState extends State<SubirPublicacionPantalla> {
   @override
   void initState() {
     super.initState();
-    // Solo el turista necesita la lista de lugares para elegir
-    if (!_esEmpresa) _cargarLugares();
   }
 
   @override
   void dispose() {
     _descripcion.dispose();
     super.dispose();
+   _espera?.cancel();
+    _buscadorLugar.dispose();
   }
 
   Future<void> _cargarLugares() async {
@@ -72,6 +79,50 @@ class _SubirPublicacionPantallaState extends State<SubirPublicacionPantalla> {
     } finally {
       if (mounted) setState(() => _cargandoLugares = false);
     }
+  }
+
+    /// Cada letra: espera un momento y busca los lugares que coinciden
+  void _alEscribirLugar(String texto) {
+    _espera?.cancel();
+    if (texto.trim().isEmpty) {
+      setState(() {
+        _sugerencias = [];
+        _buscandoLugar = false;
+      });
+      return;
+    }
+    setState(() => _buscandoLugar = true);
+    _espera = Timer(const Duration(milliseconds: 400), () async {
+      final consulta = texto.trim();
+      try {
+        final lugares = await LugaresServicio.listar(busqueda: consulta);
+        if (!mounted || _buscadorLugar.text.trim() != consulta) return;
+        setState(() {
+          _sugerencias = lugares.take(6).toList();
+          _buscandoLugar = false;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _buscandoLugar = false);
+      }
+    });
+  }
+
+  void _elegirLugar(Lugar lugar) {
+    setState(() {
+      _lugarElegido = lugar;
+      _lugarId = lugar.id;
+      _sugerencias = [];
+      _buscadorLugar.clear();
+    });
+    FocusScope.of(context).unfocus();
+  }
+
+  void _quitarLugar() {
+    setState(() {
+      _lugarElegido = null;
+      _lugarId = null;
+    });
   }
 
   /// Abre la galería (o el explorador de archivos en Windows) para elegir la foto
@@ -180,8 +231,7 @@ class _SubirPublicacionPantallaState extends State<SubirPublicacionPantalla> {
     );
   }
 
-  /// Para el turista: lista para elegir el lugar. Para el lugar turístico: un aviso.
-  Widget _selectorLugar() {
+   Widget _selectorLugar() {
     if (_esEmpresa) {
       final nombre = context.read<SesionProveedor>().usuario?.nombre ?? 'tu lugar';
       return Row(
@@ -193,36 +243,77 @@ class _SubirPublicacionPantallaState extends State<SubirPublicacionPantalla> {
       );
     }
 
-    if (_cargandoLugares) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: LinearProgressIndicator(),
+    // Ya eligió un lugar: se muestra como una etiqueta que se puede quitar
+    if (_lugarElegido != null) {
+      return InputChip(
+        avatar: Icon(Icons.place_outlined, size: 18, color: Tema.acento(context)),
+        label: Text(
+          '${_lugarElegido!.nombre} · '
+          '${_lugarElegido!.tipo == 'empresa' ? 'Empresa' : 'Destino'}',
+        ),
+        onDeleted: _quitarLugar,
       );
     }
 
-    if (_errorLugares != null) {
-      return Row(
-        children: [
-          Expanded(child: Text(_errorLugares!)),
-          TextButton(onPressed: _cargarLugares, child: const Text('Reintentar')),
-        ],
-      );
-    }
-
-    return DropdownButtonFormField<int>(
-      value: _lugarId,
-      isExpanded: true,
-      decoration: const InputDecoration(labelText: '¿Qué lugar visitaste?'),
-      items: [
-        for (final lugar in _lugares)
-          DropdownMenuItem(
-            value: lugar.id,
-            child: Text('${lugar.nombre} (${lugar.categoria})',
-                overflow: TextOverflow.ellipsis),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _buscadorLugar,
+          onChanged: _alEscribirLugar,
+          decoration: InputDecoration(
+            labelText: '¿Qué lugar visitaste? (opcional)',
+            hintText: 'Escribe para buscar un lugar',
+            prefixIcon: Icon(Icons.search, color: Tema.acento(context)),
+            suffixIcon: _buscandoLugar
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : null,
+          ),
+        ),
+        if (_sugerencias.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              color: Tema.superficie(context),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              children: [
+                for (final l in _sugerencias)
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      l.tipo == 'empresa'
+                          ? Icons.storefront_outlined
+                          : Icons.landscape_outlined,
+                      color: Tema.acento(context),
+                    ),
+                    title: Text(l.nombre, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(
+                      l.tipo == 'empresa' ? 'Empresa' : 'Destino',
+                      style: TextStyle(color: Tema.suave(context)),
+                    ),
+                    onTap: () => _elegirLugar(l),
+                  ),
+              ],
+            ),
+          )
+        else if (_buscadorLugar.text.trim().isNotEmpty && !_buscandoLugar)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'No se encontraron lugares. Puedes publicar sin etiquetar.',
+              style: TextStyle(fontSize: 13, color: Tema.suave(context)),
+            ),
           ),
       ],
-      onChanged: (valor) => setState(() => _lugarId = valor),
-      validator: (valor) => valor == null ? 'Elige el lugar de la foto' : null,
     );
   }
 

@@ -1,5 +1,8 @@
 // Perfil público de una persona (turista): datos básicos y sus números.
 const pool = require('../config/db')
+const path = require('path')
+const { limpiar, opcional } = require('../utils/validar')
+const { DIR_PERFILES, esImagenReal, borrarArchivo } = require('../utils/imagen')
 
 const aEntero = (valor, defecto) => {
   const n = Number.parseInt(valor, 10)
@@ -32,5 +35,69 @@ async function ver(req, res, next) {
     next(err)
   }
 }
+// Borra la foto recién subida y responde con el error
+async function rechazar(res, archivo, codigo, mensaje) {
+  if (archivo) await borrarArchivo(archivo.path)
+  return res.status(codigo).json({ mensaje })
+}
 
-module.exports = { ver }
+// PUT /api/usuarios/me  (necesita token, solo turistas)
+// form-data: nombre?, biografia?, imagen? (foto de perfil)
+// Lo que no se envía, se queda como estaba.
+async function editar(req, res, next) {
+  const archivo = req.file
+  try {
+    const body = req.body || {}
+
+    const [filas] = await pool.query(
+      'SELECT nombre, biografia, foto_perfil FROM usuarios WHERE id = ?',
+      [req.usuario.id]
+    )
+    const actual = filas[0]
+    if (!actual) return rechazar(res, archivo, 404, 'Usuario no encontrado')
+
+    let nombre = actual.nombre
+    if (body.nombre !== undefined) {
+      nombre = limpiar(body.nombre)
+      if (!nombre || nombre.length > 50) {
+        return rechazar(res, archivo, 400, 'El nombre es obligatorio (máximo 50 caracteres)')
+      }
+    }
+
+    let biografia = actual.biografia
+    if (body.biografia !== undefined) {
+      biografia = opcional(body.biografia)
+      if (biografia && biografia.length > 300) {
+        return rechazar(res, archivo, 400, 'La biografía es demasiado larga (máximo 300)')
+      }
+    }
+
+    let fotoPerfil = actual.foto_perfil
+    if (archivo) {
+      if (!(await esImagenReal(archivo.path))) {
+        return rechazar(res, archivo, 400, 'El archivo no es una imagen válida')
+      }
+      fotoPerfil = `/uploads/perfiles/${archivo.filename}`
+    }
+
+    await pool.query(
+      'UPDATE usuarios SET nombre = ?, biografia = ?, foto_perfil = ? WHERE id = ?',
+      [nombre, biografia, fotoPerfil, req.usuario.id]
+    )
+
+    // Si subió una foto nueva, se borra la anterior
+    if (archivo && actual.foto_perfil) {
+      await borrarArchivo(path.join(DIR_PERFILES, path.basename(actual.foto_perfil)))
+    }
+
+    res.json({
+      mensaje: 'Perfil actualizado',
+      usuario: { id: req.usuario.id, nombre, biografia, foto_perfil: fotoPerfil }
+    })
+  } catch (err) {
+    if (archivo) await borrarArchivo(archivo.path)
+    next(err)
+  }
+}
+
+module.exports = { ver, editar }

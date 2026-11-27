@@ -7,12 +7,14 @@ import '../modelos/lugar_detalle.dart';
 import '../modelos/publicacion.dart';
 import '../proveedores/sesion_proveedor.dart';
 import '../proveedores/tema_proveedor.dart';
-import '../servicios/api_cliente.dart';
 import '../servicios/lugar_perfil_servicio.dart';
 import 'login_pantalla.dart';
 import 'resenas_pantalla.dart';
 import 'subir_publicacion_pantalla.dart';
 import 'publicacion_pantalla.dart';
+import '../widgets/formulario_resena.dart';
+import 'editar_lugar_pantalla.dart';
+import '../widgets/avatar_perfil.dart';
 
 /// Perfil de un lugar turístico o empresa.
 /// - Visitante: ve la info, deja reseña y puede llamar.
@@ -20,9 +22,14 @@ import 'publicacion_pantalla.dart';
 class LugarPerfilPantalla extends StatefulWidget {
   final int? lugarId;
   final bool esMio; // true = abre el lugar de quien tiene la sesión
+  final int recarga; // cuando cambia, se vuelve a pedir el lugar
 
-  const LugarPerfilPantalla({super.key, this.lugarId, this.esMio = false})
-      : assert(lugarId != null || esMio);
+  const LugarPerfilPantalla({
+    super.key,
+    this.lugarId,
+    this.esMio = false,
+    this.recarga = 0,
+  }) : assert(lugarId != null || esMio);
 
   @override
   State<LugarPerfilPantalla> createState() => _LugarPerfilPantallaState();
@@ -41,6 +48,12 @@ class _LugarPerfilPantallaState extends State<LugarPerfilPantalla> {
   void initState() {
     super.initState();
     _cargar();
+  }
+
+  @override
+  void didUpdateWidget(covariant LugarPerfilPantalla anterior) {
+    super.didUpdateWidget(anterior);
+    if (anterior.recarga != widget.recarga) _cargar();
   }
 
   Future<void> _cargar() async {
@@ -116,6 +129,16 @@ class _LugarPerfilPantallaState extends State<LugarPerfilPantalla> {
     }
   }
 
+  Future<void> _editarPerfil() async {
+    final guardado = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => EditarLugarPantalla(lugar: _lugar!)),
+    );
+    if (guardado == true && mounted) {
+      _cargar();
+      _aviso('Perfil actualizado');
+    }
+  }
+
   Future<void> _verResenas() async {
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) =>
@@ -140,7 +163,7 @@ class _LugarPerfilPantallaState extends State<LugarPerfilPantalla> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _FormularioResena(lugarId: _lugar!.id),
+      builder: (_) => FormularioResena(lugarId: _lugar!.id),
     );
     if (guardada == true && mounted) {
       _aviso('¡Gracias por tu reseña!');
@@ -148,7 +171,7 @@ class _LugarPerfilPantallaState extends State<LugarPerfilPantalla> {
     }
   }
 
-    Future<void> _cerrarSesion() async {
+  Future<void> _cerrarSesion() async {
     final sesion = context.read<SesionProveedor>();
     final nav = Navigator.of(context);
     await sesion.cerrarSesion();
@@ -285,29 +308,8 @@ class _LugarPerfilPantallaState extends State<LugarPerfilPantalla> {
     );
   }
 
-  Widget _avatar(LugarDetalle l) {
-    final vacio = Container(
-      color: Tema.chipDe(context),
-      child: Icon(
-        l.esEmpresa ? Icons.storefront_outlined : Icons.landscape_outlined,
-        size: 38,
-        color: Tema.acento(context),
-      ),
-    );
-    return ClipOval(
-      child: SizedBox(
-        width: 84,
-        height: 84,
-        child: l.fotoPortada == null
-            ? vacio
-            : Image.network(
-                ApiConfig.imagen(l.fotoPortada!),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stack) => vacio,
-              ),
-      ),
-    );
-  }
+  Widget _avatar(LugarDetalle l) =>
+      AvatarPerfil(foto: l.fotoPortada, tamano: 84);
 
   Widget _dato(String valor, String etiqueta,
       {IconData? icono, VoidCallback? alTocar}) {
@@ -423,11 +425,7 @@ class _LugarPerfilPantallaState extends State<LugarPerfilPantalla> {
         children: [
           if (dueno) ...[
             Expanded(
-              child: _botonSecundario(
-                'Editar perfil',
-                () => _aviso(
-                    'Editar el perfil (foto, horario...) viene en el siguiente paso'),
-              ),
+              child: _botonSecundario('Editar perfil', _editarPerfil),
             ),
             const SizedBox(width: 8),
             Expanded(child: _botonSecundario('Ver reseñas', _verResenas)),
@@ -551,7 +549,7 @@ class _LugarPerfilPantallaState extends State<LugarPerfilPantalla> {
                 itemBuilder: (context, i) {
                   final p = fotos[i];
                   return GestureDetector(
-                                       onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => PublicacionPantalla(publicacion: p))),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -568,113 +566,6 @@ class _LugarPerfilPantallaState extends State<LugarPerfilPantalla> {
                   );
                 },
               ),
-      ),
-    );
-  }
-}
-
-/// Hoja para dejar una reseña (estrellas + comentario opcional)
-class _FormularioResena extends StatefulWidget {
-  final int lugarId;
-  const _FormularioResena({required this.lugarId});
-
-  @override
-  State<_FormularioResena> createState() => _FormularioResenaState();
-}
-
-class _FormularioResenaState extends State<_FormularioResena> {
-  final _texto = TextEditingController();
-  int _estrellas = 0;
-  bool _enviando = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _texto.dispose();
-    super.dispose();
-  }
-
-  Future<void> _enviar() async {
-    setState(() {
-      _enviando = true;
-      _error = null;
-    });
-    try {
-      await LugarPerfilServicio.enviarResena(
-        lugarId: widget.lugarId,
-        estrellas: _estrellas,
-        texto: _texto.text.trim(),
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _enviando = false;
-        _error = ApiCliente.mensajeDeError(e);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-          20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Deja tu reseña',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              5,
-              (i) => IconButton(
-                tooltip: '${i + 1} estrellas',
-                onPressed: () => setState(() => _estrellas = i + 1),
-                icon: Icon(
-                  i < _estrellas ? Icons.star_rounded : Icons.star_outline_rounded,
-                  size: 38,
-                  color: const Color(0xFFF5B301),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _texto,
-            maxLines: 3,
-            maxLength: 500,
-            decoration: const InputDecoration(
-              labelText: 'Cuéntanos tu experiencia (opcional)',
-              alignLabelWithHint: true,
-            ),
-          ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(_error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: (_estrellas == 0 || _enviando) ? null : _enviar,
-              child: _enviando
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Publicar reseña'),
-            ),
-          ),
-        ],
       ),
     );
   }

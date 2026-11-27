@@ -9,13 +9,20 @@ import '../proveedores/tema_proveedor.dart';
 import '../servicios/usuario_perfil_servicio.dart';
 import 'publicacion_pantalla.dart';
 import 'subir_publicacion_pantalla.dart';
+import 'editar_perfil_pantalla.dart';
+import '../widgets/avatar_perfil.dart';
 
 /// Perfil de un turista. Si es el de quien tiene la sesión, muestra
 /// las opciones de dueño (+, modo oscuro, editar y cerrar sesión).
 class PerfilUsuarioPantalla extends StatefulWidget {
   final int usuarioId;
+  final int recarga; // cuando cambia, se vuelve a pedir el perfil
 
-  const PerfilUsuarioPantalla({super.key, required this.usuarioId});
+  const PerfilUsuarioPantalla({
+    super.key,
+    required this.usuarioId,
+    this.recarga = 0,
+  });
 
   @override
   State<PerfilUsuarioPantalla> createState() => _PerfilUsuarioPantallaState();
@@ -31,6 +38,12 @@ class _PerfilUsuarioPantallaState extends State<PerfilUsuarioPantalla> {
   void initState() {
     super.initState();
     _cargar();
+  }
+
+  @override
+  void didUpdateWidget(covariant PerfilUsuarioPantalla anterior) {
+    super.didUpdateWidget(anterior);
+    if (anterior.recarga != widget.recarga) _cargar();
   }
 
   Future<void> _cargar() async {
@@ -72,6 +85,16 @@ class _PerfilUsuarioPantallaState extends State<PerfilUsuarioPantalla> {
     if (publicada == true && mounted) {
       _cargar();
       _aviso('Publicación creada');
+    }
+  }
+
+  Future<void> _editarPerfil() async {
+    final guardado = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => EditarPerfilPantalla(perfil: _perfil!)),
+    );
+    if (guardado == true && mounted) {
+      _cargar();
+      _aviso('Perfil actualizado');
     }
   }
 
@@ -186,25 +209,8 @@ class _PerfilUsuarioPantallaState extends State<PerfilUsuarioPantalla> {
     );
   }
 
-  Widget _avatar(PerfilUsuario p) {
-    final vacio = Container(
-      color: Tema.chipDe(context),
-      child: Icon(Icons.person_outline, size: 40, color: Tema.acento(context)),
-    );
-    return ClipOval(
-      child: SizedBox(
-        width: 84,
-        height: 84,
-        child: p.fotoPerfil == null
-            ? vacio
-            : Image.network(
-                ApiConfig.imagen(p.fotoPerfil!),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stack) => vacio,
-              ),
-      ),
-    );
-  }
+  Widget _avatar(PerfilUsuario p) =>
+      AvatarPerfil(foto: p.fotoPerfil, tamano: 84);
 
   Widget _dato(String valor, String etiqueta) {
     return Expanded(
@@ -245,7 +251,7 @@ class _PerfilUsuarioPantallaState extends State<PerfilUsuarioPantalla> {
           minimumSize: const Size.fromHeight(42),
           shape: const StadiumBorder(),
         ),
-        onPressed: () => _aviso('Editar el perfil (foto, biografía) viene en el siguiente paso'),
+        onPressed: _editarPerfil,
         child: const Text('Editar perfil'),
       ),
     );

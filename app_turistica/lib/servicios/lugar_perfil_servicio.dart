@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import '../modelos/lugar_detalle.dart';
 import '../modelos/publicacion.dart';
 import '../modelos/resena.dart';
@@ -54,4 +56,42 @@ class LugarPerfilServicio {
       if (texto != null && texto.isNotEmpty) 'texto': texto,
     });
   }
+  /// PUT /api/lugares/mio (form-data)
+  /// Edita el lugar de la empresa con sesión. El nombre no se puede cambiar.
+  /// Solo se envía lo que no sea null. Si [bytes] viene, se sube como foto de perfil.
+  static Future<void> editarMio({
+    String? descripcion,
+    String? direccion,
+    String? telefono,
+    String? horario,
+    Uint8List? bytes,
+    String? nombreArchivo,
+  }) async {
+    final formulario = FormData.fromMap({
+      if (descripcion != null) 'descripcion': descripcion,
+      if (direccion != null) 'direccion': direccion,
+      if (telefono != null) 'telefono': telefono,
+      if (horario != null) 'horario': horario,
+      if (bytes != null && nombreArchivo != null)
+        'imagen': MultipartFile.fromBytes(
+          bytes,
+          filename: nombreArchivo,
+          contentType: DioMediaType.parse(_tipoDeImagen(nombreArchivo)),
+        ),
+    });
+    await ApiCliente.dio.put('/lugares/mio', data: formulario);
+  }
+
+  static String _tipoDeImagen(String nombreArchivo) {
+    final extension = nombreArchivo.split('.').last.toLowerCase();
+    switch (extension) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'image/jpeg';
+    }
+  }
+
 }

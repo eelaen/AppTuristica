@@ -171,6 +171,8 @@ async function listar(req, res, next) {
               u.id AS usuario_id, u.nombre AS usuario_nombre, u.rol AS usuario_rol,
               COALESCE((SELECT la.verificado FROM lugares la WHERE la.usuario_id = u.id LIMIT 1), 0)
                 AS autor_verificado,
+                COALESCE((SELECT la2.foto_portada FROM lugares la2 WHERE la2.usuario_id = u.id LIMIT 1),
+         u.foto_perfil) AS autor_foto,
               l.id AS lugar_id, l.nombre AS lugar_nombre,
               (SELECT COUNT(*) FROM likes k WHERE k.publicacion_id = p.id) AS likes,
               (SELECT COUNT(*) FROM comentarios c WHERE c.publicacion_id = p.id) AS comentarios,

@@ -4,6 +4,8 @@ const path = require('path')
 
 // Carpeta donde se guardan las fotos de las publicaciones (backend/uploads/publicaciones)
 const DIR_PUBLICACIONES = path.join(__dirname, '..', '..', 'uploads', 'publicaciones')
+// Carpeta donde se guardan las fotos de perfil (backend/uploads/perfiles)
+const DIR_PERFILES = path.join(__dirname, '..', '..', 'uploads', 'perfiles')
 
 // Comprueba que el archivo REALMENTE sea una imagen JPG, PNG o WEBP.
 // El tipo que dice el cliente se puede falsificar, así que se leen los
@@ -36,4 +38,4 @@ async function borrarArchivo(ruta) {
   }
 }
 
-module.exports = { DIR_PUBLICACIONES, esImagenReal, borrarArchivo }
+module.exports = { DIR_PUBLICACIONES, DIR_PERFILES, esImagenReal, borrarArchivo }
