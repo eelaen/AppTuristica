@@ -51,6 +51,24 @@ class PublicacionesServicio {
     await ApiCliente.dio.post('/publicaciones', data: formulario);
   }
 
+    /// POST /api/publicaciones/:id/like
+  static Future<({int likes, bool yoDiLike})> darLike(int id) async {
+    final r = await ApiCliente.dio.post('/publicaciones/$id/like');
+    return (
+      likes: (r.data['likes'] as num).toInt(),
+      yoDiLike: r.data['yo_di_like'] == true,
+    );
+  }
+
+  /// DELETE /api/publicaciones/:id/like
+  static Future<({int likes, bool yoDiLike})> quitarLike(int id) async {
+    final r = await ApiCliente.dio.delete('/publicaciones/$id/like');
+    return (
+      likes: (r.data['likes'] as num).toInt(),
+      yoDiLike: r.data['yo_di_like'] == true,
+    );
+  }
+
   /// Tipo de imagen según la extensión del archivo
   static String _tipoDeImagen(String nombreArchivo) {
     final extension = nombreArchivo.split('.').last.toLowerCase();

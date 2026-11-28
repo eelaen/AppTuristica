@@ -40,6 +40,27 @@ class Publicacion {
   /// true si es una oferta especial
   bool get esOferta => tipo == 'oferta';
 
+    /// Copia la publicación cambiando solo likes, comentarios o yoDiLike
+  Publicacion copyWith({int? likes, int? comentarios, bool? yoDiLike}) {
+    return Publicacion(
+      id: id,
+      imagen: imagen,
+      descripcion: descripcion,
+      ubicacion: ubicacion,
+      tipo: tipo,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      usuarioRol: usuarioRol,
+      autorVerificado: autorVerificado,
+      autorFoto: autorFoto,
+      lugarId: lugarId,
+      lugarNombre: lugarNombre,
+      likes: likes ?? this.likes,
+      comentarios: comentarios ?? this.comentarios,
+      yoDiLike: yoDiLike ?? this.yoDiLike,
+    );
+  }
+
   /// Convierte el JSON del backend en una Publicacion.
   factory Publicacion.fromJson(Map<String, dynamic> json) {
     return Publicacion(

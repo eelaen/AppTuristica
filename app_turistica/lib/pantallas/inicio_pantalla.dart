@@ -9,6 +9,7 @@ import 'login_pantalla.dart';
 import 'lugar_perfil_pantalla.dart';
 import 'publicacion_pantalla.dart';
 import 'perfil_usuario_pantalla.dart';
+import '../servicios/publicaciones_servicio.dart';
 
 /// Inicio: encabezado, acceso a Explorar y el feed de publicaciones
 /// con filtro Todos / Turistas / Empresas. Es pública: se ve sin cuenta.
@@ -38,6 +39,9 @@ class _InicioPantallaState extends State<InicioPantalla> {
   String? _autor; // null = todos
   late Future<List<Publicacion>> _futuro;
 
+  // Publicaciones modificadas en pantalla (por ejemplo, tras dar like)
+  final Map<int, Publicacion> _editadas = {};
+
   @override
   void initState() {
     super.initState();
@@ -53,11 +57,12 @@ class _InicioPantallaState extends State<InicioPantalla> {
   Future<List<Publicacion>> _cargar() =>
       PublicacionesServicio.feed(autor: _autor);
 
-  void _recargar() {
-  setState(() {
-    _futuro = _cargar();
-  });
-}
+   void _recargar() {
+    setState(() {
+      _editadas.clear();
+      _futuro = _cargar();
+    });
+  }
 
   void _aviso(String texto) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -82,6 +87,32 @@ class _InicioPantallaState extends State<InicioPantalla> {
     }
   }
 
+    /// Da o quita like. El corazón cambia al instante y, si falla, se devuelve.
+  Future<void> _alternarLike(Publicacion p) async {
+    final nueva = p.copyWith(
+      yoDiLike: !p.yoDiLike,
+      likes: p.likes + (p.yoDiLike ? -1 : 1),
+    );
+    setState(() {
+      _editadas[p.id] = nueva;
+    });
+    try {
+      final r = p.yoDiLike
+          ? await PublicacionesServicio.quitarLike(p.id)
+          : await PublicacionesServicio.darLike(p.id);
+      if (!mounted) return;
+      setState(() {
+        _editadas[p.id] = nueva.copyWith(likes: r.likes, yoDiLike: r.yoDiLike);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _editadas[p.id] = p;
+      });
+      _aviso('No se pudo actualizar el like');
+    }
+  }
+  
   void _abrirExplorar() => widget.alIrAExplorar();
 
   
@@ -318,11 +349,11 @@ class _InicioPantallaState extends State<InicioPantalla> {
       ];
     }
 
-       return publicaciones.map((p) {
+          return publicaciones.map((original) {
+      final p = _editadas[original.id] ?? original;
       return TarjetaPublicacion(
         publicacion: p,
-        alDarLike: () =>
-            _conSesion(() => _aviso('Dar like se conecta en el siguiente paso')),
+        alDarLike: () => _conSesion(() => _alternarLike(p)),
         alComentar: () =>
             _aviso('Los comentarios se conectan en un paso próximo'),
          alTocarCuenta: () {

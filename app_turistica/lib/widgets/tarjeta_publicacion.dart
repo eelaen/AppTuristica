@@ -183,8 +183,8 @@ class TarjetaPublicacion extends StatelessWidget {
     );
   }
 
-  /// Corazón + número, comentario + número, y guardar a la derecha
-  Widget _acciones(BuildContext context, Publicacion p) {
+  /// Corazón + número, y guardar a la derecha
+   Widget _acciones(BuildContext context, Publicacion p) {
     final suave = Tema.suave(context);
     return Row(
       children: [
@@ -200,18 +200,6 @@ class TarjetaPublicacion extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text('${p.likes}', style: TextStyle(color: suave)),
-            ],
-          ),
-        ),
-        const SizedBox(width: 18),
-        InkWell(
-          onTap: alComentar,
-          borderRadius: BorderRadius.circular(8),
-          child: Row(
-            children: [
-              Icon(Icons.chat_bubble_outline, size: 21, color: suave),
-              const SizedBox(width: 4),
-              Text('${p.comentarios}', style: TextStyle(color: suave)),
             ],
           ),
         ),
